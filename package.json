@@ -1,0 +1,29 @@
+{
+  "name": "jobs-scraper-scheduler",
+  "version": "1.0.0",
+  "description": "매일 오전 9시에 데이터를 수집하고 Firebase에 저장하는 자동 업로드 시스템",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "scheduler": "node scheduler.js",
+    "test": "node test-scraper.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "node-cron": "^3.0.3",
+    "axios": "^1.6.0",
+    "cheerio": "^1.0.0-rc.12",
+    "firebase-admin": "^11.11.0"
+  },
+  "keywords": [
+    "scraper",
+    "scheduler",
+    "firebase",
+    "cron",
+    "auto-upload"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+} 

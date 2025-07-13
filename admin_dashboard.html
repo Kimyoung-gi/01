@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 대시보드</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Firebase SDK 추가 -->
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
+    <style>
+        body {
+            background: #f8f9fa;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .navbar-brand {
+            color: white !important;
+            font-weight: bold;
+        }
+        .nav-link {
+            color: rgba(255,255,255,0.8) !important;
+        }
+        .nav-link:hover {
+            color: white !important;
+        }
+        .main-container {
+            padding: 2rem;
+        }
+        .upload-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        .upload-area {
+            border: 2px dashed #667eea;
+            border-radius: 10px;
+            padding: 2rem;
+            text-align: center;
+            background: #f8f9ff;
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #f0f2ff;
+        }
+        .upload-area.dragover {
+            border-color: #764ba2;
+            background: #e8ecff;
+        }
+        .file-input {
+            display: none;
+        }
+        .btn-upload {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 8px;
+            padding: 12px 30px;
+            font-weight: bold;
+            color: white;
+        }
+        .btn-upload:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .info-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .csv-template {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+        #downloadSection {
+            display: block !important;
+        }
+        .btn-outline-success, .btn-outline-info {
+            margin-bottom: 0.5rem;
+        }
+        .channel-details {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .channel-details:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .channel-details .alert {
+            margin-bottom: 0;
+        }
+        #uploadProgress .card {
+            border: 2px solid #007bff;
+            box-shadow: 0 4px 8px rgba(0,123,255,0.1);
+        }
+        #uploadProgress .progress {
+            height: 8px;
+        }
+        #uploadProgress .progress-bar {
+            background: linear-gradient(45deg, #007bff, #0056b3);
+        }
+        #stepDetails {
+            max-height: 150px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        #stepDetails div {
+            margin-bottom: 5px;
+            padding: 2px 0;
+        }
+        .upload-item {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            height: 100%;
+        }
+        .upload-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border-color: #007bff;
+        }
+        .upload-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .upload-title {
+            font-weight: bold;
+            margin-left: 8px;
+            font-size: 14px;
+        }
+        .upload-details {
+            font-size: 12px;
+            color: #6c757d;
+        }
+        .upload-time {
+            margin-bottom: 4px;
+        }
+        .upload-count {
+            font-weight: 500;
+        }
+        .upload-item.has-data {
+            background: #e8f5e8;
+            border-color: #28a745;
+        }
+        .upload-item.has-data .upload-count {
+            color: #28a745;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <a class="navbar-brand" href="index.html">
+                <i class="fas fa-cog me-2"></i>관리자 대시보드
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="index.html">
+                    <i class="fas fa-home me-1"></i>메인 페이지
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container main-container">
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="upload-card">
+                    <h3 class="mb-4">
+                        <i class="fas fa-upload me-2"></i>데이터 자동 업로드
+                    </h3>
+                    
+                    <!-- 자동 업로드 설정 -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6><i class="fas fa-clock me-2"></i>자동 업로드 설정</h6>
+                                    <p class="text-muted mb-3">매일 오전 9시에 자동으로 데이터를 수집하고 업로드합니다.</p>
+                                    <button type="button" class="btn btn-secondary" id="autoUploadToggle" onclick="toggleAutoUpload()">
+                                        <i class="fas fa-pause me-2"></i>자동 업로드 중지
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6><i class="fas fa-play me-2"></i>수동 업로드</h6>
+                                    <p class="text-muted mb-3">지금 바로 모든 데이터를 수집하고 업로드합니다.</p>
+                                    <button type="button" class="btn btn-primary" id="manualUploadBtn" onclick="testManualUpload()">
+                                        <i class="fas fa-upload me-2"></i>수동 업로드
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm mt-2" onclick="testConnection()">
+                                        <i class="fas fa-wifi me-2"></i>연결 테스트
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 업로드 진행 상황 표시 -->
+                    <div id="uploadProgress" style="display: none;">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6><i class="fas fa-spinner fa-spin me-2"></i>업로드 진행 상황</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span id="progressText">초기화 중...</span>
+                                        <span id="progressPercent">0%</span>
+                                    </div>
+                                    <div class="progress">
+                                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                             id="progressBar" role="progressbar" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                                <div id="currentStep" class="alert alert-info alert-sm">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    <span id="stepText">시스템 초기화 중...</span>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-md-6">
+                                        <small class="text-muted">
+                                            <i class="fas fa-clock me-1"></i>
+                                            <span id="elapsedTime">00:00</span> 경과
+                                        </small>
+                                    </div>
+                                    <div class="col-md-6 text-end">
+                                        <small class="text-muted">
+                                            <i class="fas fa-tasks me-1"></i>
+                                            <span id="currentTask">0/3</span> 완료
+                                        </small>
+                                    </div>
+                                </div>
+                                <div id="stepDetails" class="small text-muted">
+                                    <!-- 단계별 상세 정보가 여기에 표시됩니다 -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 업로드 결과 표시 -->
+                    <div id="uploadResults"></div>
+                    
+                    <!-- 기존 CSV 업로드 -->
+                    <hr class="my-4">
+                    <h5><i class="fas fa-file-csv me-2"></i>CSV 파일 수동 업로드</h5>
+                    <form id="uploadForm">
+                        <div class="upload-area" id="uploadArea">
+                            <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                            <h5>CSV 파일을 선택하거나 여기에 드래그하세요</h5>
+                            <p class="text-muted">지원 형식: CSV 파일</p>
+                            <input type="file" class="file-input" id="csvFile" name="file" accept=".csv" required>
+                            <button type="button" class="btn btn-upload" onclick="document.getElementById('csvFile').click()">
+                                <i class="fas fa-folder-open me-2"></i>파일 선택
+                            </button>
+                            <div id="fileInfo" style="display: none;"></div>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <button type="submit" class="btn btn-upload" id="uploadBtn">
+                                <i class="fas fa-upload me-2"></i>업로드
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- 업로드 정보 카드 위치를 여기로 이동 -->
+                    <div class="info-card">
+                        <h5><i class="fas fa-database me-2"></i>업로드 정보</h5>
+                        <div id="uploadSummary">
+                            <div class="row">
+                                <div class="col-6 mb-3">
+                                    <div class="upload-item" onclick="showChannelDetail('사람인')">
+                                        <div class="upload-header">
+                                            <i class="fas fa-building text-primary"></i>
+                                            <span class="upload-title">사람인</span>
+                                        </div>
+                                        <div class="upload-details" id="saraminSummary">
+                                            <div class="upload-time">업로드 시간: -</div>
+                                            <div class="upload-count">업로드 수량: 0개</div>
+                                        </div>
+                                        <div class="mt-2">
+                                            <button class="btn btn-outline-primary btn-sm w-100" onclick="downloadSaraminData()">
+                                                <i class="fas fa-download me-1"></i>사람인 데이터 다운로드
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <div class="upload-item" onclick="showChannelDetail('메디잡')">
+                                        <div class="upload-header">
+                                            <i class="fas fa-hospital text-success"></i>
+                                            <span class="upload-title">메디잡</span>
+                                        </div>
+                                        <div class="upload-details" id="medijobSummary">
+                                            <div class="upload-time">업로드 시간: -</div>
+                                            <div class="upload-count">업로드 수량: 0개</div>
+                                        </div>
+                                        <div class="mt-2">
+                                            <button class="btn btn-outline-success btn-sm w-100" onclick="downloadMedijobData()">
+                                                <i class="fas fa-download me-1"></i>메디잡 데이터 다운로드
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <div class="upload-item" onclick="showChannelDetail('헤어인잡')">
+                                        <div class="upload-header">
+                                            <i class="fas fa-cut text-warning"></i>
+                                            <span class="upload-title">헤어인잡</span>
+                                        </div>
+                                        <div class="upload-details" id="hairinjobSummary">
+                                            <div class="upload-time">업로드 시간: -</div>
+                                            <div class="upload-count">업로드 수량: 0개</div>
+                                        </div>
+                                        <div class="mt-2">
+                                            <button class="btn btn-outline-warning btn-sm w-100" onclick="downloadHairinjobData()">
+                                                <i class="fas fa-download me-1"></i>헤어인잡 데이터 다운로드
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <div class="upload-item" onclick="showCSVUploadHistory()">
+                                        <div class="upload-header">
+                                            <i class="fas fa-file-csv text-info"></i>
+                                            <span class="upload-title">CSV 파일</span>
+                                        </div>
+                                        <div class="upload-details" id="csvSummary">
+                                            <div class="upload-time">업로드 시간: -</div>
+                                            <div class="upload-count">업로드 수량: 0개</div>
+                                        </div>
+                                        <div class="mt-2">
+                                            <button class="btn btn-outline-info btn-sm w-100" onclick="downloadCSVUploadData()">
+                                                <i class="fas fa-download me-1"></i>CSV 업로드 데이터 다운로드
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-4">
+                <div class="info-card">
+                    <h5><i class="fas fa-info-circle me-2"></i>CSV 파일 형식</h5>
+                    <p>다음 컬럼이 포함된 CSV 파일을 업로드해주세요:</p>
+                    <ul>
+                        <li><strong>회사명</strong> - 기업명</li>
+                        <li><strong>직무</strong> - 채용 직무</li>
+                        <li><strong>일정</strong> - 오픈 일정</li>
+                        <li><strong>업종</strong> - 업종 정보</li>
+                        <li><strong>연락처</strong> - 연락처 정보</li>
+                        <li><strong>주소</strong> - 회사 주소</li>
+                    </ul>
+                </div>
+                
+
+                
+                <div class="info-card">
+                    <h5><i class="fas fa-history me-2"></i>최근 업로드 정보</h5>
+                    <div id="uploadHistory">
+                        <p class="text-muted">아직 업로드된 파일이 없습니다.</p>
+                    </div>
+                    <div id="downloadSection">
+                        <hr class="my-3">
+                        <h6><i class="fas fa-download me-2"></i>데이터 다운로드</h6>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-success btn-sm" onclick="downloadCurrentData()">
+                                <i class="fas fa-file-csv me-1"></i>현재 데이터 다운로드
+                            </button>
+                            <button class="btn btn-outline-info btn-sm" onclick="downloadSampleTemplate()">
+                                <i class="fas fa-file-download me-1"></i>CSV 템플릿 다운로드
+                            </button>
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                다운로드된 파일은 UTF-8 인코딩으로 저장됩니다.<br>
+                                <i class="fas fa-clock me-1"></i>
+                                파일명 형식: SARAMIN_MMDD(HHMM).csv
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 채널 상세 정보 모달 -->
+    <div class="modal fade" id="channelDetailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="channelModalTitle">채널 상세 정보</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="channelModalBody">
+                    <!-- 상세 정보가 여기에 표시됩니다 -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="firebase-config.js"></script>
+    <script src="static/script.js"></script>
+    <script src="auto_upload.js"></script>
+    <script>
+        // 스크립트 로드 확인
+        console.log('스크립트 로드 상태 확인:');
+        console.log('firebase:', typeof firebase !== 'undefined');
+        console.log('rtdb:', typeof rtdb !== 'undefined');
+        console.log('manualUpload:', typeof manualUpload !== 'undefined');
+        console.log('toggleAutoUpload:', typeof toggleAutoUpload !== 'undefined');
+        console.log('testConnection:', typeof testConnection !== 'undefined');
+        // 전역 함수로 다운로드 함수들 등록
+        window.downloadCurrentData = downloadCurrentData;
+        window.downloadSampleTemplate = downloadSampleTemplate;
+        window.downloadSaraminData = downloadSaraminData;
+        window.downloadMedijobData = downloadMedijobData;
+        window.downloadHairinjobData = downloadHairinjobData;
+        window.downloadCSVUploadData = downloadCSVUploadData;
+        
+        // 수동 업로드 함수들 등록
+        window.manualUpload = manualUpload;
+        window.toggleAutoUpload = toggleAutoUpload;
+        window.testConnection = testConnection;
+        window.showChannelDetail = showChannelDetail;
+        
+        // 테스트 함수 추가
+        window.testManualUpload = function() {
+            console.log('수동 업로드 버튼 클릭됨');
+            
+            // manualUpload 함수가 있는지 확인
+            if (typeof manualUpload === 'function') {
+                console.log('manualUpload 함수 발견, 실행 시작');
+                manualUpload();
+            } else {
+                console.error('manualUpload 함수를 찾을 수 없음');
+                alert('manualUpload 함수를 찾을 수 없습니다. auto_upload.js 파일을 확인해주세요.');
+            }
+        };
+        
+
+        
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('관리자 대시보드 페이지 로드됨');
+            
+            // 관리자 대시보드 초기화
+            if (typeof initializeAdminDashboard === 'function') {
+                console.log('initializeAdminDashboard 함수 호출');
+                initializeAdminDashboard();
+            } else {
+                console.error('initializeAdminDashboard 함수를 찾을 수 없음');
+            }
+            
+            // 파일 선택 이벤트 수동 설정
+            const fileInput = document.getElementById('csvFile');
+            const fileInfo = document.getElementById('fileInfo');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const uploadForm = document.getElementById('uploadForm');
+            
+            console.log('파일 입력 요소들:', { fileInput, fileInfo, uploadBtn, uploadForm });
+            
+            // 파일 선택 이벤트
+            if (fileInput) {
+                fileInput.addEventListener('change', function(e) {
+                    console.log('파일 선택 이벤트 발생');
+                    const file = e.target.files[0];
+                    console.log('선택된 파일:', file);
+                    
+                    if (file) {
+                        fileInfo.innerHTML = `
+                            <div class="mt-3">
+                                <i class="fas fa-file-csv fa-3x text-success mb-3"></i>
+                                <h5>선택된 파일: ${file.name}</h5>
+                                <p class="text-muted">파일 크기: ${(file.size / 1024).toFixed(2)} KB</p>
+                            </div>
+                        `;
+                        fileInfo.style.display = 'block';
+                        uploadBtn.style.display = 'inline-block';
+                        console.log('파일 정보 표시됨');
+                    } else {
+                        fileInfo.style.display = 'none';
+                        uploadBtn.style.display = 'none';
+                    }
+                });
+            }
+            
+            // 폼 제출 이벤트
+            if (uploadForm) {
+                uploadForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    console.log('폼 제출 이벤트 발생');
+                    
+                    const file = fileInput.files[0];
+                    if (!file) {
+                        alert('파일을 선택해주세요.');
+                        return;
+                    }
+                    
+                    console.log('업로드 시작:', file.name);
+                    
+                    // 로딩 상태 표시
+                    uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>업로드 중...';
+                    uploadBtn.disabled = true;
+                    
+                    try {
+                        // 파일 읽기 및 처리
+                        const jobsData = await parseCSVFile(file);
+                        console.log('CSV 파싱 완료:', jobsData);
+                        
+                        // CSV 업로드 데이터를 별도로 저장
+                        const success = await saveCSVUploadData(jobsData);
+                        
+                        if (success) {
+                            alert(`CSV 파일이 성공적으로 업로드되었습니다!\n총 ${jobsData.length}개의 데이터가 저장되었습니다.`);
+                            
+                            // 파일 정보 초기화
+                            fileInput.value = '';
+                            fileInfo.style.display = 'none';
+                            uploadBtn.style.display = 'none';
+                            
+                            // 업로드 히스토리 업데이트
+                            await updateUploadHistory();
+                        } else {
+                            alert('업로드 중 오류가 발생했습니다.');
+                        }
+                    } catch (error) {
+                        console.error('업로드 오류:', error);
+                        alert('파일 처리 중 오류가 발생했습니다: ' + error.message);
+                    } finally {
+                        // 로딩 상태 해제
+                        uploadBtn.innerHTML = '<i class="fas fa-upload me-2"></i>업로드';
+                        uploadBtn.disabled = false;
+                    }
+                });
+            }
+            
+
+        });
+    </script>
+</body>
+</html> 
