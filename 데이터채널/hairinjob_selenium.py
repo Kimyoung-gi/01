@@ -184,7 +184,7 @@ class HairinjobSeleniumScraper:
             
             # 링크 처리
             for link in unique_links:
-                if len(job_links) >= 10:  # 10개만 수집
+                if len(job_links) >= 50:  # 50개만 수집
                     break
                     
                 href = link.get_attribute('href')
@@ -471,7 +471,7 @@ class HairinjobSeleniumScraper:
         
         # 현재 시간으로 파일명 생성
         now = datetime.now()
-        filename = f"HAIRINJOB_{now.strftime('%m%d')}({now.strftime('%H%M')})_{len(jobs_data)}jobs.csv"
+        filename = f"HAIRINJOB_{now.strftime('%m%d')}({now.strftime('%H%M')})_50jobs.csv"
         
         # 한글 헤더
         fieldnames = ['회사명', '직무', '일정', '주소', '업종', '연락처']
