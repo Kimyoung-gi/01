@@ -211,50 +211,96 @@ class SaraminScraper:
             'industry': industry  # 업종 추가
         }
     
-    def search_jobs(self, max_count=10):  # 10개로 변경
-        """사람인에서 채용 정보 검색 (10개)"""
+    def search_jobs(self, max_count=70):  # 70개로 변경
+        """사람인에서 채용 정보 검색 (70개)"""
         try:
-            # 검색 키워드를 "오픈예정" 하나로만 변경
-            search_keyword = "오픈예정","오픈 예정","신규오픈","신규 오픈"
+            # 검색 키워드와 각각의 목표 개수 설정
+            search_keywords = ["오픈예정", "개원예정"]
+            keyword_targets = {"오픈예정": 50, "개원예정": 20}  # 각 키워드별 목표 개수
             
-            print(f"'{search_keyword}' 키워드로 채용 정보 검색 중... (최대 {max_count}개)")
+            print(f"'{', '.join(search_keywords)}' 키워드로 채용 정보 검색 중... (총 {max_count}개)")
             
             jobs_data = []
-            page = 1
             
-            while len(jobs_data) < max_count:
-                # 검색 URL 구성
-                search_url = f"{self.base_url}/zf_user/search/recruit"
-                params = {
-                    'searchword': search_keyword,
-                    'recruitPage': page,
-                    'recruitSort': 'accuracy'  # 관련도순
-                }
+            # 각 키워드별로 검색
+            for keyword in search_keywords:
+                target_count = keyword_targets[keyword]  # 각 키워드별 목표 개수
+                current_keyword_count = 0  # 현재 키워드로 수집한 개수
                 
-                response = requests.get(search_url, params=params, headers=self.headers)
+                print(f"키워드 '{keyword}' 검색 중... (목표: {target_count}개)")
+                page = 1
                 
-                if response.status_code == 200:
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    job_listings = soup.find_all('div', class_='item_recruit')
+                while current_keyword_count < target_count:
+                    # 검색 URL 구성 - 사람인 검색 URL 구조 수정
+                    # 방법 1: 기본 검색 URL
+                    search_url = f"{self.base_url}/zf_user/search/recruit"
+                    params = {
+                        'searchword': keyword,
+                        'recruitPage': page,
+                        'recruitSort': 'accuracy',  # 관련도순
+                        'recruitType': 'all',  # 전체 채용
+                        'recruitPageCount': 40  # 페이지당 40개
+                    }
                     
-                    if not job_listings:
-                        print(f"페이지 {page}에서 더 이상 채용정보를 찾을 수 없습니다.")
-                        break
+                    print(f"검색 URL: {search_url}?searchword={keyword}&recruitPage={page}")
+                    response = requests.get(search_url, params=params, headers=self.headers)
                     
-                    for job in job_listings:
-                        if len(jobs_data) >= max_count:
+                    # 응답 상태 확인 및 디버깅
+                    print(f"응답 상태 코드: {response.status_code}")
+                    if response.status_code != 200:
+                        # 방법 2: 다른 검색 URL 시도
+                        search_url = f"{self.base_url}/zf_user/search/recruit?searchword={keyword}&recruitPage={page}"
+                        print(f"대체 검색 URL 시도: {search_url}")
+                        response = requests.get(search_url, headers=self.headers)
+                        print(f"대체 URL 응답 상태 코드: {response.status_code}")
+                    
+                    if response.status_code != 200:
+                        print(f"응답 내용 일부: {response.text[:500]}")
+                    
+                    if response.status_code == 200:
+                        soup = BeautifulSoup(response.text, 'html.parser')
+                        
+                        # 여러 가능한 채용정보 컨테이너 클래스 시도
+                        job_listings = soup.find_all('div', class_='item_recruit')
+                        if not job_listings:
+                            job_listings = soup.find_all('div', class_='job_item')
+                        if not job_listings:
+                            job_listings = soup.find_all('div', class_='recruit_item')
+                        if not job_listings:
+                            job_listings = soup.find_all('div', class_='job_list_item')
+                        if not job_listings:
+                            job_listings = soup.find_all('div', class_='recruit_list_item')
+                        
+                        print(f"키워드 '{keyword}' 페이지 {page}에서 {len(job_listings)}개의 채용정보 발견")
+                        
+                        if not job_listings:
+                            print(f"키워드 '{keyword}' 페이지 {page}에서 더 이상 채용정보를 찾을 수 없습니다.")
                             break
                         
-                        job_info = self.parse_job_listing(str(job))
-                        if job_info['title']:  # 제목이 있는 경우만 추가
-                            jobs_data.append(job_info)
-                            print(f"처리 완료 ({len(jobs_data)}/{max_count}): {job_info['company']} - {job_info['title']}")
-                    
-                    page += 1
-                    time.sleep(1)  # 페이지 간 요청 간격
-                else:
-                    print(f"페이지 {page} 요청 실패: {response.status_code}")
-                    break
+                        for job in job_listings:
+                            if current_keyword_count >= target_count:
+                                break
+                            
+                            job_info = self.parse_job_listing(str(job))
+                            if job_info['title']:  # 제목이 있는 경우만 추가
+                                # 중복 체크 (회사명이 동일한 경우 제외)
+                                duplicate = False
+                                for existing_job in jobs_data:
+                                    if existing_job['company'] == job_info['company']:
+                                        duplicate = True
+                                        print(f"중복 회사 제외: {job_info['company']}")
+                                        break
+                                
+                                if not duplicate:
+                                    jobs_data.append(job_info)
+                                    current_keyword_count += 1
+                                    print(f"처리 완료 ({len(jobs_data)}/총{max_count}, {current_keyword_count}/{target_count}): {job_info['company']} - {job_info['title']}")
+                        
+                        page += 1
+                        time.sleep(1)  # 페이지 간 요청 간격
+                    else:
+                        print(f"키워드 '{keyword}' 페이지 {page} 요청 실패: {response.status_code}")
+                        break
             
             print(f"총 {len(jobs_data)}개의 채용정보를 수집했습니다.")
             return jobs_data
@@ -268,7 +314,7 @@ class SaraminScraper:
         try:
             # 현재 시간으로 파일명 생성 (SARAMIN_MMDD(HHMM) 형식)
             now = datetime.now()
-            filename = f"SARAMIN_{now.strftime('%m%d')}({now.strftime('%H%M')})_10jobs.csv"  # 10jobs로 변경
+            filename = f"SARAMIN_{now.strftime('%m%d')}({now.strftime('%H%M')})_70jobs.csv"  # 70jobs로 변경
             
             # CSV 파일 저장
             with open(filename, 'w', newline='', encoding='utf-8-sig') as csvfile:
@@ -296,9 +342,9 @@ class SaraminScraper:
 if __name__ == "__main__":
     scraper = SaraminScraper()
     
-    # 10개 채용정보 스크래핑
-    print("=== 오픈예정 채용정보 10개 스크래핑 시작 ===")
-    jobs = scraper.search_jobs(10)  # 10개로 변경
+    # 70개 채용정보 스크래핑 (오픈예정 50개, 개원예정 20개)
+    print("=== 오픈예정 50개, 개원예정 20개 채용정보 스크래핑 시작 ===")
+    jobs = scraper.search_jobs(70)  # 70개로 변경
     
     if jobs:
         # CSV 파일로 저장
